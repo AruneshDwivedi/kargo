@@ -382,8 +382,7 @@ func (s *server) createStagePromotion(
 				CreatePromotion: s.createPromotionFn,
 			},
 		); err != nil {
-			var exists *api.AutoPromotionHoldExistsError
-			if errors.As(err, &exists) {
+			if exists, ok := errors.AsType[*api.AutoPromotionHoldExistsError](err); ok {
 				return nil, newStagePromotionConflictError(
 					"an auto-promotion hold is already %s for origin %q; wait for "+
 						"the current rollback to settle or resume auto-promotion "+
@@ -498,24 +497,21 @@ func checkExpectedAutoCandidate(
 }
 
 func stagePromotionRESTError(err error) error {
-	var conflictErr *stagePromotionConflictError
-	if errors.As(err, &conflictErr) {
+	if conflictErr, ok := errors.AsType[*stagePromotionConflictError](err); ok {
 		return libhttp.ErrorStr(conflictErr.Error(), http.StatusConflict)
 	}
 	return err
 }
 
 func stagePromotionConnectError(err error) error {
-	var conflictErr *stagePromotionConflictError
-	if errors.As(err, &conflictErr) {
+	if conflictErr, ok := errors.AsType[*stagePromotionConflictError](err); ok {
 		return connect.NewError(connect.CodeFailedPrecondition, conflictErr)
 	}
 	return err
 }
 
 func createPromotionError(err error) error {
-	var statusErr *apierrors.StatusError
-	if errors.As(err, &statusErr) {
+	if statusErr, ok := errors.AsType[*apierrors.StatusError](err); ok {
 		status := statusErr.ErrStatus
 		status.Message = fmt.Sprintf("create promotion: %s", status.Message)
 		return &apierrors.StatusError{ErrStatus: status}
@@ -528,8 +524,7 @@ func createPromotionError(err error) error {
 // internal error. Unlike createPromotionError it adds no prefix; it is for
 // errors whose messages are already self-describing.
 func statusOrInternalError(err error) error {
-	var statusErr *apierrors.StatusError
-	if errors.As(err, &statusErr) {
+	if _, ok := errors.AsType[*apierrors.StatusError](err); ok {
 		return err
 	}
 	return apierrors.NewInternalError(err)

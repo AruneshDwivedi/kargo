@@ -517,7 +517,7 @@ func (r *reconciler) Reconcile(
 			// If the error is due to an invalid status update, we should mark
 			// the Promotion as errored to prevent it from being requeued.
 			//
-			// NB: This should be a rare occurrence, and is either due to the
+			// NOTE: This should be a rare occurrence, and is either due to the
 			// CustomResourceDefinition being out of sync with the controller
 			// version, or us inventing non-backwards-compatible changes.
 			err = kubeclient.PatchStatus(ctx, r.kargoClient, promo, func(status *kargoapi.PromotionStatus) {

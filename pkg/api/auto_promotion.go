@@ -23,22 +23,25 @@ import (
 // when an auto-promotion is aborted because a Stage hold superseded it.
 const AutoPromotionBlockedByHoldMessage = "auto-promotion superseded by an auto-promotion hold"
 
-// IsAutoPromotionEnabled returns whether the ProjectConfig enables
-// auto-promotion for the supplied Stage metadata.
-func IsAutoPromotionEnabled(
+// FindMatchingPromotionPolicy returns the first PromotionPolicy in the
+// Project's ProjectConfig whose stage selector matches the supplied Stage
+// metadata. Policies are evaluated in order and the first match wins, even
+// when a later policy also matches. It returns nil when the Project has no
+// ProjectConfig or no policy matches.
+func FindMatchingPromotionPolicy(
 	ctx context.Context,
 	c client.Client,
 	stage metav1.ObjectMeta,
-) (bool, error) {
+) (*kargoapi.PromotionPolicy, error) {
 	projectCfg := &kargoapi.ProjectConfig{}
 	if err := c.Get(ctx, types.NamespacedName{
 		Name:      stage.Namespace,
 		Namespace: stage.Namespace,
 	}, projectCfg); err != nil {
 		if apierrors.IsNotFound(err) {
-			return false, nil
+			return nil, nil
 		}
-		return false, fmt.Errorf("error getting ProjectConfig for Project %q: %w", stage.Namespace, err)
+		return nil, fmt.Errorf("error getting ProjectConfig for Project %q: %w", stage.Namespace, err)
 	}
 
 	for _, policy := range projectCfg.Spec.PromotionPolicies {
@@ -53,7 +56,7 @@ func IsAutoPromotionEnabled(
 		if nameSelector := policy.StageSelector.Name; nameSelector != "" {
 			m, err := pattern.ParseNamePattern(nameSelector)
 			if err != nil {
-				return false, fmt.Errorf("error parsing PromotionPolicy name pattern %q: %w", nameSelector, err)
+				return nil, fmt.Errorf("error parsing PromotionPolicy name pattern %q: %w", nameSelector, err)
 			}
 			if !m.Matches(stage.Name) {
 				continue
@@ -63,23 +66,40 @@ func IsAutoPromotionEnabled(
 		if labelSelector := policy.StageSelector.LabelSelector; labelSelector != nil {
 			s, err := metav1.LabelSelectorAsSelector(labelSelector)
 			if err != nil {
-				return false, fmt.Errorf("error parsing PromotionPolicy label selector %q: %w", labelSelector, err)
+				return nil, fmt.Errorf("error parsing PromotionPolicy label selector %q: %w", labelSelector, err)
 			}
 			if !s.Matches(labels.Set(stage.Labels)) {
 				continue
 			}
 		}
 
-		return policy.AutoPromotionEnabled, nil
+		return &policy, nil
 	}
 
-	return false, nil
+	return nil, nil
 }
 
-// SelectAutoPromotionCandidates returns the Freight selected by each requested
-// origin's auto-promotion selection policy. This is the candidate selection
-// decision only; callers still own write-side guards such as current-Freight,
-// existing-Promotion, and hold checks.
+// IsAutoPromotionEnabled returns whether the ProjectConfig enables
+// auto-promotion for the supplied Stage metadata.
+func IsAutoPromotionEnabled(
+	ctx context.Context,
+	c client.Client,
+	stage metav1.ObjectMeta,
+) (bool, error) {
+	policy, err := FindMatchingPromotionPolicy(ctx, c, stage)
+	if err != nil {
+		return false, err
+	}
+	return policy != nil && policy.AutoPromotionEnabled, nil
+}
+
+// SelectAutoPromotionCandidates returns, for each origin in the Stage's
+// requested Freight, the available Freight that origin's auto-promotion
+// selection policy would pick. Selection is all this does: it never decides
+// whether the pick should actually be promoted. Before acting on a candidate,
+// callers apply their own checks -- e.g. that the candidate is not already the
+// Stage's current Freight, that no Promotion for it already exists, and that
+// no auto-promotion hold blocks its origin.
 func SelectAutoPromotionCandidates(
 	stage *kargoapi.Stage,
 	availableFreight []kargoapi.Freight,
@@ -242,14 +262,14 @@ func (e *AutoPromotionHoldExistsError) Error() string {
 // controller's enforcement gate sees it and cannot let an auto-promotion of
 // newer Freight stomp the rollback in the window between the two writes. If
 // creating the Promotion fails without persisting, the pending hold is rolled
-// back; if it might have persisted the hold is kept and left for the Stage
+// back; if it might have persisted, the hold is kept and left for the Stage
 // controller to reconcile.
 //
 // It never overwrites an existing hold for the origin: when one is already
-// present it returns an error wrapping an *AutoPromotionHoldExistsError
+// present, it returns an error wrapping an *AutoPromotionHoldExistsError
 // (discoverable with errors.As) without changing state.
 //
-// promotion must be a non-auto Promotion of freight on stageKey's Stage and must
+// Promotion must be a non-auto Promotion of freight on stageKey's Stage and must
 // already be named (build it with kargo.NewPromotionBuilder); these invariants
 // are validated up front to keep the hold and its Promotion coherent. Status
 // writes use c, so callers pass whichever client is allowed to patch Stage
@@ -274,7 +294,6 @@ func CreatePendingAutoPromotionHold(
 	// Second-truncate the timestamp so the in-memory hold is identical to what
 	// every reader sees after the API server's RFC3339 serialization. This is
 	// what lets the cleanup path below re-find the hold by exact identity.
-	now := metav1.Now().Rfc3339Copy()
 	hold := kargoapi.AutoPromotionHold{
 		FreightName:   freight.Name,
 		Origin:        freight.Origin,
@@ -282,7 +301,7 @@ func CreatePendingAutoPromotionHold(
 		PromotionName: promotion.Name,
 		Actor:         opts.Actor,
 		Reason:        opts.Reason,
-		CreatedAt:     &now,
+		CreatedAt:     new(metav1.Now().Rfc3339Copy()),
 	}
 
 	// Hold-first. The only precondition checked against live state is that no

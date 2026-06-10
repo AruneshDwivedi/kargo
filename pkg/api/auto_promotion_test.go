@@ -16,6 +16,131 @@ import (
 	kargoapi "github.com/akuity/kargo/api/v1alpha1"
 )
 
+func TestFindMatchingPromotionPolicy(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, kargoapi.AddToScheme(scheme))
+
+	stageMeta := metav1.ObjectMeta{
+		Name:      "fake-stage",
+		Namespace: "fake-project",
+	}
+	testCases := []struct {
+		name        string
+		objects     []runtime.Object
+		interceptor interceptor.Funcs
+		assert      func(*testing.T, *kargoapi.PromotionPolicy, error)
+	}{
+		{
+			name: "nil without ProjectConfig",
+			assert: func(t *testing.T, policy *kargoapi.PromotionPolicy, err error) {
+				require.NoError(t, err)
+				require.Nil(t, policy)
+			},
+		},
+		{
+			name: "error getting ProjectConfig",
+			interceptor: interceptor.Funcs{
+				Get: func(
+					context.Context,
+					client.WithWatch,
+					client.ObjectKey,
+					client.Object,
+					...client.GetOption,
+				) error {
+					return errors.New("something went wrong")
+				},
+			},
+			assert: func(t *testing.T, policy *kargoapi.PromotionPolicy, err error) {
+				require.ErrorContains(t, err, "something went wrong")
+				require.Nil(t, policy)
+			},
+		},
+		{
+			name: "nil when no policy matches",
+			objects: []runtime.Object{
+				&kargoapi.ProjectConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake-project",
+						Namespace: "fake-project",
+					},
+					Spec: kargoapi.ProjectConfigSpec{
+						PromotionPolicies: []kargoapi.PromotionPolicy{{
+							StageSelector: &kargoapi.PromotionPolicySelector{Name: "other-stage"},
+						}},
+					},
+				},
+			},
+			assert: func(t *testing.T, policy *kargoapi.PromotionPolicy, err error) {
+				require.NoError(t, err)
+				require.Nil(t, policy)
+			},
+		},
+		{
+			name: "returns first matching policy even when a later one also matches",
+			objects: []runtime.Object{
+				&kargoapi.ProjectConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake-project",
+						Namespace: "fake-project",
+					},
+					Spec: kargoapi.ProjectConfigSpec{
+						PromotionPolicies: []kargoapi.PromotionPolicy{
+							{
+								StageSelector:        &kargoapi.PromotionPolicySelector{Name: "other-stage"},
+								AutoPromotionEnabled: false,
+							},
+							{
+								StageSelector:        &kargoapi.PromotionPolicySelector{Name: "fake-stage"},
+								AutoPromotionEnabled: true,
+							},
+							{
+								StageSelector:        &kargoapi.PromotionPolicySelector{Name: "fake-stage"},
+								AutoPromotionEnabled: false,
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, policy *kargoapi.PromotionPolicy, err error) {
+				require.NoError(t, err)
+				require.NotNil(t, policy)
+				require.True(t, policy.AutoPromotionEnabled)
+			},
+		},
+		{
+			name: "matches by deprecated Stage field",
+			objects: []runtime.Object{
+				&kargoapi.ProjectConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake-project",
+						Namespace: "fake-project",
+					},
+					Spec: kargoapi.ProjectConfigSpec{
+						PromotionPolicies: []kargoapi.PromotionPolicy{{
+							Stage: "fake-stage", // nolint:staticcheck
+						}},
+					},
+				},
+			},
+			assert: func(t *testing.T, policy *kargoapi.PromotionPolicy, err error) {
+				require.NoError(t, err)
+				require.NotNil(t, policy)
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			c := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithRuntimeObjects(testCase.objects...).
+				WithInterceptorFuncs(testCase.interceptor).
+				Build()
+			policy, err := FindMatchingPromotionPolicy(t.Context(), c, stageMeta)
+			testCase.assert(t, policy, err)
+		})
+	}
+}
+
 func TestIsAutoPromotionEnabled(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, kargoapi.AddToScheme(scheme))
