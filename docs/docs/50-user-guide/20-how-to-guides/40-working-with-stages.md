@@ -164,14 +164,6 @@ kargo resume-auto-promotion \
   --origin Warehouse/my-warehouse
 ```
 
-:::note
-Only promotions made directly to a `Stage` pause and resume auto-promotion
-this way. `Promotion` resources created by other means -- promoting to
-`Stage`s downstream from another `Stage`, or applying a `Promotion` manifest
-directly -- do not, and an auto-promotion may subsequently replace the
-`Freight` they promoted.
-:::
-
 #### Examples
 
 In the following example, the `test` `Stage` requests `Freight` that has

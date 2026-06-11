@@ -653,7 +653,7 @@ func (r *RegularStageReconciler) syncPromotions(
 			if lastPromo != nil {
 				// We can break here since we know that all subsequent Promotions
 				// will be older than the last Promotion we saw.
-				// NOTE: This makes use of the fact that Promotion names are
+				// NB: This makes use of the fact that Promotion names are
 				// generated, and contain a timestamp component which will ensure
 				// that they can be sorted in a consistent order.
 				if strings.Compare(promo.Name, lastPromo.Name) <= 0 {
@@ -717,7 +717,7 @@ func (r *RegularStageReconciler) syncPromotions(
 				// ArgoCD Applications. This is used to provide deep links to the
 				// ArgoCD UI for the Stage in the Kargo UI.
 				//
-				// NOTE: If the health checks do not include ArgoCD Applications,
+				// NB: If the health checks do not include ArgoCD Applications,
 				// then the annotation will be removed.
 				if err := api.AnnotateStageWithArgoCDContext(ctx, r.client, p.Status.HealthChecks, stage); err != nil {
 					// Let the error be logged, but do not return it as it is not
@@ -2055,7 +2055,7 @@ func (r *RegularStageReconciler) autoPromoteFreight(
 	newStatus := *stage.Status.DeepCopy()
 
 	// If the Stage has no requested Freight, then there is nothing to promote.
-	// NOTE: This should not happen in practice, as a Stage cannot exist without
+	// NB: This should not happen in practice, as a Stage cannot exist without
 	// requested Freight.
 	if len(stage.Spec.RequestedFreight) == 0 {
 		return newStatus, nil
