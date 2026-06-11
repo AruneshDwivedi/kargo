@@ -312,7 +312,7 @@ func (s *server) handleError(c *gin.Context) {
 		// Check for MaxBytesError (body too large)
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
-			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "request body too large"})
+			c.JSON(http.StatusRequestEntityTooLarge, resourceErrorResponse{Error: "request body too large"})
 			return
 		}
 
@@ -322,7 +322,7 @@ func (s *server) handleError(c *gin.Context) {
 				respondInternalServerError(c, err)
 				return
 			}
-			c.JSON(httpErr.Code(), gin.H{"error": httpErr.Error()})
+			c.JSON(httpErr.Code(), resourceErrorResponse{Error: httpErr.Error()})
 			return
 		}
 		var statusErr *apierrors.StatusError
@@ -331,7 +331,7 @@ func (s *server) handleError(c *gin.Context) {
 			// user-actionable messages and pass through verbatim. 5xx messages
 			// can embed internal details, so log them and respond generically.
 			if code := int(statusErr.Status().Code); code < http.StatusInternalServerError {
-				c.JSON(code, gin.H{"error": err.Error()})
+				c.JSON(code, resourceErrorResponse{Error: err.Error()})
 				return
 			}
 			respondInternalServerError(c, err)
@@ -348,6 +348,6 @@ func respondInternalServerError(c *gin.Context, err error) {
 		Error(err, "internal server error")
 	c.JSON(
 		http.StatusInternalServerError,
-		gin.H{"error": "internal server error"},
+		resourceErrorResponse{Error: "internal server error"},
 	)
 }
