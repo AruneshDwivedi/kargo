@@ -978,6 +978,37 @@ func TestRegularStageReconciler_syncPromotions(t *testing.T) {
 			},
 		},
 		{
+			name: "pending auto-promotion hold without a Promotion name is removed as malformed",
+			stage: &kargoapi.Stage{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "fake-project",
+					Name:      "test-stage",
+				},
+				Spec: kargoapi.StageSpec{
+					RequestedFreight: []kargoapi.FreightRequest{{Origin: origin}},
+				},
+				Status: kargoapi.StageStatus{
+					AutoPromotionHolds: map[string]kargoapi.AutoPromotionHold{
+						"Warehouse/test-warehouse": {
+							FreightName: "older-freight",
+							Origin:      origin,
+							State:       kargoapi.AutoPromotionHoldStatePending,
+							// Second-truncated, as every hold writer persists it.
+							CreatedAt: new(metav1.Now().Rfc3339Copy()),
+						},
+					},
+				},
+			},
+			assertions: func(t *testing.T, status kargoapi.StageStatus, hasPendingPromotions bool, err error) {
+				require.NoError(t, err)
+				assert.False(t, hasPendingPromotions)
+				// Only out-of-band status writes can produce a pending hold with
+				// no Promotion name; it could otherwise never settle and would
+				// fail the sync with empty-name Promotion reads forever.
+				assert.Empty(t, status.AutoPromotionHolds)
+			},
+		},
+		{
 			// The Stage controller intentionally does NOT abort a held
 			// auto-promotion. The Promotion controller is the single hard gate and
 			// aborts it before any promotion steps run; here it simply remains the

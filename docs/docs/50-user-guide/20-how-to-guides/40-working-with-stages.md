@@ -150,10 +150,12 @@ Valid policies are:
   from _exactly one_ upstream `Stage`.
 
 When a user deliberately promotes `Freight` other than the current
-auto-promotion candidate to a `Stage`, Kargo pauses auto-promotion for that
-`Freight` origin on that `Stage`. This prevents automation from immediately
-moving the `Stage` back to that candidate. Auto-promotion remains paused until
-a user promotes the current auto-promotion candidate or resumes it explicitly:
+auto-promotion candidate directly to a `Stage` (from the dashboard or with
+`kargo promote --stage`), Kargo pauses auto-promotion for that `Freight` origin
+on that `Stage`. This prevents automation from immediately moving the `Stage`
+back to that candidate. Auto-promotion remains paused until a user promotes the
+current auto-promotion candidate directly to the `Stage` or resumes it
+explicitly:
 
 ```shell
 kargo resume-auto-promotion \
@@ -161,6 +163,14 @@ kargo resume-auto-promotion \
   --stage test \
   --origin Warehouse/my-warehouse
 ```
+
+:::note
+Only promotions made directly to a `Stage` pause and resume auto-promotion
+this way. `Promotion` resources created by other means -- promoting to
+`Stage`s downstream from another `Stage`, or applying a `Promotion` manifest
+directly -- do not, and an auto-promotion may subsequently replace the
+`Freight` they promoted.
+:::
 
 #### Examples
 

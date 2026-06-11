@@ -327,7 +327,14 @@ func (s *server) handleError(c *gin.Context) {
 		}
 		var statusErr *apierrors.StatusError
 		if ok := errors.As(err, &statusErr); ok {
-			c.JSON(int(statusErr.Status().Code), gin.H{"error": err.Error()})
+			// 4xx StatusErrors (Forbidden, NotFound, Conflict, ...) carry
+			// user-actionable messages and pass through verbatim. 5xx messages
+			// can embed internal details, so log them and respond generically.
+			if code := int(statusErr.Status().Code); code < http.StatusInternalServerError {
+				c.JSON(code, gin.H{"error": err.Error()})
+				return
+			}
+			respondInternalServerError(c, err)
 			return
 		}
 		respondInternalServerError(c, err)

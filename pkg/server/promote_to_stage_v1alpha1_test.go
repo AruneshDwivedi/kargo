@@ -1145,7 +1145,7 @@ func Test_server_promoteToStage(t *testing.T) {
 				}),
 				assertions: func(t *testing.T, w *httptest.ResponseRecorder, c client.Client) {
 					require.Equal(t, http.StatusConflict, w.Code)
-					require.Contains(t, w.Body.String(), "an auto-promotion hold is already pending")
+					require.Contains(t, w.Body.String(), "a rollback is already settling")
 
 					promos := &kargoapi.PromotionList{}
 					err := c.List(t.Context(), promos, client.InNamespace(testProject.Name))
@@ -1242,7 +1242,9 @@ func Test_server_promoteToStage(t *testing.T) {
 				}),
 				assertions: func(t *testing.T, w *httptest.ResponseRecorder, c client.Client) {
 					require.Equal(t, http.StatusInternalServerError, w.Code)
-					require.Contains(t, w.Body.String(), "promotion create failed")
+					// 5xx details are logged server-side, never leaked to clients.
+					require.Contains(t, w.Body.String(), "internal server error")
+					require.NotContains(t, w.Body.String(), "promotion create failed")
 
 					stage := &kargoapi.Stage{}
 					require.NoError(t, c.Get(

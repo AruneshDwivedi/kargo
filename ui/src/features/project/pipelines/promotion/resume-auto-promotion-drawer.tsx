@@ -97,6 +97,9 @@ export const ResumeAutoPromotionDrawer = ({
     if (candidatesQuery.isLoading) {
       return 'Checking the current auto-promotion candidate.';
     }
+    if (candidatesQuery.isError) {
+      return 'Could not determine the current auto-promotion candidate; resuming may immediately trigger an auto-promotion.';
+    }
 
     const candidateName = getAutoPromotionCandidate(candidates, entry.origin)?.freightName;
     if (!candidateName) {

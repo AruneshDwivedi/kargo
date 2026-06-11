@@ -895,6 +895,14 @@ func (r *RegularStageReconciler) syncAutoPromotionHold(
 		return nil
 	}
 
+	// A pending hold must name its rollback Promotion; one without a name is
+	// malformed (only out-of-band status writes can produce it) and would
+	// otherwise fail this sync with empty-name Promotion reads forever.
+	if hold.PromotionName == "" {
+		_, err := r.removeAutoPromotionHoldIfCurrent(ctx, stage, origin, hold)
+		return err
+	}
+
 	promo, err := r.getAutoPromotionHoldPromotion(ctx, stage.Namespace, hold, idx.promotionsByName)
 	if err != nil {
 		return fmt.Errorf(

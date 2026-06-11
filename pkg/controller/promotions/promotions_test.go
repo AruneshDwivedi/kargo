@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -783,6 +784,33 @@ func Test_reconciler_terminatePromotion(t *testing.T) {
 			},
 		},
 		{
+			name: "clears machine abort-reason annotation left by an incomplete hold abort",
+			promo: func() *kargoapi.Promotion {
+				p := newPromo(
+					"fake-namespace",
+					"fake-promo",
+					"fake-stage",
+					kargoapi.PromotionPhasePending,
+					now,
+				)
+				p.Annotations = map[string]string{
+					kargoapi.AnnotationKeyAbortReason: kargoapi.AnnotationValueAbortReasonAutoPromotionHold,
+				}
+				return p
+			}(),
+			assertions: func(t *testing.T, recorder *fakeevent.EventRecorder, promo *kargoapi.Promotion, err error) {
+				require.NoError(t, err)
+				require.Equal(t, kargoapi.PromotionPhaseAborted, promo.Status.Phase)
+				// The user-requested abort must not read as a hold abort, which
+				// would let auto-promotion immediately retry the same Freight.
+				require.NotContains(t, promo.Annotations, kargoapi.AnnotationKeyAbortReason)
+
+				require.Len(t, recorder.Events, 1)
+				event := <-recorder.Events
+				require.Equal(t, string(kargoapi.EventTypePromotionAborted), event.Reason)
+			},
+		},
+		{
 			name: "promotion is already terminated",
 			promo: func() *kargoapi.Promotion {
 				p := newPromo(
@@ -854,6 +882,100 @@ func Test_reconciler_terminatePromotion(t *testing.T) {
 			tt.assertions(t, recorder, tt.promo, err)
 		})
 	}
+}
+
+func Test_reconciler_abortAutoPromotion_promotionDeletedMidRetry(t *testing.T) {
+	scheme := k8sruntime.NewScheme()
+	require.NoError(t, kargoapi.SchemeBuilder.AddToScheme(scheme))
+
+	origin := kargoapi.FreightOrigin{
+		Kind: kargoapi.FreightOriginKindWarehouse,
+		Name: "fake-warehouse",
+	}
+	promo := newPromo("fake-namespace", "fake-promo", "fake-stage", kargoapi.PromotionPhasePending, now)
+	stage := &kargoapi.Stage{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-stage",
+		},
+		Status: kargoapi.StageStatus{
+			CurrentPromotion: &kargoapi.PromotionReference{Name: "fake-promo"},
+			AutoPromotionHolds: map[string]kargoapi.AutoPromotionHold{
+				origin.String(): {
+					FreightName: "older-freight",
+					Origin:      origin,
+					State:       kargoapi.AutoPromotionHoldStateActive,
+				},
+			},
+		},
+	}
+
+	// The first status patch hits a conflict; by the time the retry re-reads
+	// the Promotion, it has been deleted.
+	var patchAttempted bool
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(promo, stage).
+		WithStatusSubresource(&kargoapi.Promotion{}).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(
+				ctx context.Context,
+				cl client.WithWatch,
+				key client.ObjectKey,
+				obj client.Object,
+				opts ...client.GetOption,
+			) error {
+				if _, ok := obj.(*kargoapi.Promotion); ok && patchAttempted {
+					return apierrors.NewNotFound(
+						kargoapi.GroupVersion.WithResource("promotions").GroupResource(),
+						key.Name,
+					)
+				}
+				return cl.Get(ctx, key, obj, opts...)
+			},
+			SubResourcePatch: func(
+				ctx context.Context,
+				cl client.Client,
+				subResource string,
+				obj client.Object,
+				patch client.Patch,
+				opts ...client.SubResourcePatchOption,
+			) error {
+				if _, ok := obj.(*kargoapi.Promotion); ok && !patchAttempted {
+					patchAttempted = true
+					return apierrors.NewConflict(
+						kargoapi.GroupVersion.WithResource("promotions").GroupResource(),
+						obj.GetName(),
+						errors.New("conflict"),
+					)
+				}
+				return cl.SubResource(subResource).Patch(ctx, obj, patch, opts...)
+			},
+		}).
+		Build()
+	recorder := fakeevent.NewEventRecorder(1)
+	r := &reconciler{
+		kargoClient: c,
+		apiReader:   c,
+		sender:      k8sevent.NewEventSender(recorder),
+	}
+
+	// The abort must report false without panicking or emitting an event for
+	// a Promotion that was never actually marked aborted.
+	aborted, err := r.abortAutoPromotion(
+		t.Context(),
+		client.ObjectKeyFromObject(promo),
+		&kargoapi.Freight{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "fake-namespace",
+				Name:      "older-freight",
+			},
+			Origin: origin,
+		},
+	)
+	require.NoError(t, err)
+	require.False(t, aborted)
+	require.Len(t, recorder.Events, 0)
 }
 
 func Test_reconciler_handleDeletion(t *testing.T) {

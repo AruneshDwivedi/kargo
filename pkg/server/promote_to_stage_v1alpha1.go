@@ -383,11 +383,20 @@ func (s *server) createStagePromotion(
 			},
 		); err != nil {
 			if exists, ok := errors.AsType[*api.AutoPromotionHoldExistsError](err); ok {
+				// Resuming auto-promotion cannot clear a pending hold, so only
+				// recommend it for an active one.
+				if exists.State == kargoapi.AutoPromotionHoldStatePending {
+					return nil, newStagePromotionConflictError(
+						"a rollback is already settling for origin %q; wait for it "+
+							"to finish before creating another rollback (an orphaned "+
+							"rollback is abandoned automatically after a grace period)",
+						exists.Origin.String(),
+					)
+				}
 				return nil, newStagePromotionConflictError(
-					"an auto-promotion hold is already %s for origin %q; wait for "+
-						"the current rollback to settle or resume auto-promotion "+
-						"before creating another rollback",
-					strings.ToLower(string(exists.State)),
+					"an auto-promotion hold is already active for origin %q; resume "+
+						"auto-promotion or promote the current candidate before "+
+						"creating another rollback",
 					exists.Origin.String(),
 				)
 			}
@@ -426,13 +435,14 @@ func (s *server) createStagePromotion(
 }
 
 // annotateAutoPromotionHoldClearIfCurrent re-reads the Stage through the
-// internal client -- the cached Stage that nominated the selected Freight as
-// the current candidate may be stale -- and re-checks the caller's candidate
-// preconditions against that live snapshot. When the live snapshot carries an
-// active hold for the Freight's origin, promotion snapshots its exact identity
-// so the Stage controller clears that hold -- and no other -- if the Promotion
-// succeeds. A pending live hold is a conflict; no live hold means there is
-// nothing to clear.
+// internal client and re-checks the caller's candidate preconditions against
+// that fresher snapshot. The re-read buys recency, not a cache bypass: the
+// internal client serves reads from an informer cache, so these checks are
+// best-effort and the optimistic-locked status writes remain the real guard.
+// When the snapshot carries an active hold for the Freight's origin, promotion
+// snapshots its exact identity so the Stage controller clears that hold -- and
+// no other -- if the Promotion succeeds. A pending hold is a conflict; no hold
+// means there is nothing to clear.
 func (s *server) annotateAutoPromotionHoldClearIfCurrent(
 	ctx context.Context,
 	key client.ObjectKey,
@@ -442,7 +452,7 @@ func (s *server) annotateAutoPromotionHoldClearIfCurrent(
 ) error {
 	liveStage := &kargoapi.Stage{}
 	if err := s.client.InternalClient().Get(ctx, key, liveStage); err != nil {
-		return fmt.Errorf("get live Stage before clearing auto-promotion hold: %w", err)
+		return fmt.Errorf("re-read Stage before clearing auto-promotion hold: %w", err)
 	}
 	liveCandidate, err := s.getAutoPromotionCandidate(ctx, liveStage, freight.Origin)
 	if err != nil {

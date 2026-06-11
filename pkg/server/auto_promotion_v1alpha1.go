@@ -193,9 +193,9 @@ func (s *server) resumeAutoPromotionForOrigin(
 		)
 	}
 
-	// The patch below re-verifies the hold against live state, turning any
-	// concurrent change into a 409. Stage status is controller/API-owned, not
-	// directly user-writable.
+	// The patch below re-verifies the hold against a fresh (cache-backed) read
+	// under an optimistic lock, turning any concurrent change into a 409. Stage
+	// status is controller/API-owned, not directly user-writable.
 	originKey := origin.String()
 	changed, err := api.PatchStageAutoPromotionHolds(
 		ctx,

@@ -199,7 +199,7 @@ Stability is not guaranteed.
 
 
 ### CreateConfigMapRequest.DataEntry {#akuity-io-kargo-service-v1alpha1-CreateConfigMapRequest-DataEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -226,7 +226,7 @@ Stability is not guaranteed.
 
 
 ### CreateGenericCredentialsRequest.DataEntry {#akuity-io-kargo-service-v1alpha1-CreateGenericCredentialsRequest-DataEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -574,14 +574,14 @@ Stability is not guaranteed.
 
 
 ### GetClusterConfigRequest {#akuity-io-kargo-service-v1alpha1-GetClusterConfigRequest}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | format | [RawFormat](#akuity-io-kargo-service-v1alpha1-RawFormat) |   |
 
 
 ### GetClusterConfigResponse {#akuity-io-kargo-service-v1alpha1-GetClusterConfigResponse}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | cluster_config | [github.com.akuity.kargo.api.v1alpha1.ClusterConfig](#github-com-akuity-kargo-api-v1alpha1-ClusterConfig) |   |
@@ -636,7 +636,7 @@ Stability is not guaranteed.
 
 
 ### GetConfigResponse.ArgocdShardsEntry {#akuity-io-kargo-service-v1alpha1-GetConfigResponse-ArgocdShardsEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -845,7 +845,7 @@ Stability is not guaranteed.
 
 
 ### ImageStageMap.StagesEntry {#akuity-io-kargo-service-v1alpha1-ImageStageMap-StagesEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -947,7 +947,7 @@ Stability is not guaranteed.
 
 
 ### ListImagesResponse.ImagesEntry {#akuity-io-kargo-service-v1alpha1-ListImagesResponse-ImagesEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1141,7 +1141,7 @@ Stability is not guaranteed.
 
 
 ### QueryFreightResponse.GroupsEntry {#akuity-io-kargo-service-v1alpha1-QueryFreightResponse-GroupsEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1149,7 +1149,7 @@ Stability is not guaranteed.
 
 
 ### RefreshResourceRequest {#akuity-io-kargo-service-v1alpha1-RefreshResourceRequest}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | project | string |  project is the name of the project containing the object to refresh. leave blank if refreshing a cluster-config. |
@@ -1158,7 +1158,7 @@ Stability is not guaranteed.
 
 
 ### RefreshResourceResponse {#akuity-io-kargo-service-v1alpha1-RefreshResourceResponse}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | resource | google.protobuf.Any |   |
@@ -1200,7 +1200,7 @@ Stability is not guaranteed.
 
 
 ### TagMap.TagsEntry {#akuity-io-kargo-service-v1alpha1-TagMap-TagsEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1220,7 +1220,7 @@ Stability is not guaranteed.
 
 
 ### UpdateConfigMapRequest.DataEntry {#akuity-io-kargo-service-v1alpha1-UpdateConfigMapRequest-DataEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1260,7 +1260,7 @@ Stability is not guaranteed.
 
 
 ### UpdateGenericCredentialsRequest.DataEntry {#akuity-io-kargo-service-v1alpha1-UpdateGenericCredentialsRequest-DataEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1348,7 +1348,7 @@ Stability is not guaranteed.
  explicitly empty
 
 ### WatchClusterConfigResponse {#akuity-io-kargo-service-v1alpha1-WatchClusterConfigResponse}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | cluster_config | [github.com.akuity.kargo.api.v1alpha1.ClusterConfig](#github-com-akuity-kargo-api-v1alpha1-ClusterConfig) |   |
@@ -1469,7 +1469,7 @@ RawFormat specifies the format for raw resource representation.
 ## rbac/v1alpha1
 
 ### Claim {#github-com-akuity-kargo-api-rbac-v1alpha1-Claim}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | name | string |   |
@@ -1477,7 +1477,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### ResourceDetails {#github-com-akuity-kargo-api-rbac-v1alpha1-ResourceDetails}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | resourceType | string |   |
@@ -1507,7 +1507,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### ServiceAccountReference {#github-com-akuity-kargo-api-rbac-v1alpha1-ServiceAccountReference}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | name | string |   |
@@ -1537,7 +1537,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### AnalysisRunMetadata.AnnotationsEntry {#github-com-akuity-kargo-api-v1alpha1-AnalysisRunMetadata-AnnotationsEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1545,7 +1545,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### AnalysisRunMetadata.LabelsEntry {#github-com-akuity-kargo-api-v1alpha1-AnalysisRunMetadata-LabelsEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1731,7 +1731,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### ClusterPromotionTask {#github-com-akuity-kargo-api-v1alpha1-ClusterPromotionTask}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | metadata | k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta |   |
@@ -1798,7 +1798,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### DiscoveredImageReference.AnnotationsEntry {#github-com-akuity-kargo-api-v1alpha1-DiscoveredImageReference-AnnotationsEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1852,7 +1852,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### FreightCollection.ItemsEntry {#github-com-akuity-kargo-api-v1alpha1-FreightCollection-ItemsEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1903,7 +1903,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### FreightSources {#github-com-akuity-kargo-api-v1alpha1-FreightSources}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | direct | bool |  Direct indicates the requested Freight may be obtained directly from the Warehouse from which it originated. If this field's value is false, then the value of the Stages field must be non-empty. i.e. Between the two fields, at least one source must be specified. |
@@ -1924,7 +1924,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### FreightStatus.ApprovedForEntry {#github-com-akuity-kargo-api-v1alpha1-FreightStatus-ApprovedForEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1932,7 +1932,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### FreightStatus.CurrentlyInEntry {#github-com-akuity-kargo-api-v1alpha1-FreightStatus-CurrentlyInEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1940,7 +1940,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### FreightStatus.MetadataEntry {#github-com-akuity-kargo-api-v1alpha1-FreightStatus-MetadataEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1948,7 +1948,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### FreightStatus.VerifiedInEntry {#github-com-akuity-kargo-api-v1alpha1-FreightStatus-VerifiedInEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -1966,7 +1966,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### GenericWebhookAction.ParametersEntry {#github-com-akuity-kargo-api-v1alpha1-GenericWebhookAction-ParametersEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -2107,7 +2107,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### Image.AnnotationsEntry {#github-com-akuity-kargo-api-v1alpha1-Image-AnnotationsEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -2322,7 +2322,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### PromotionTask {#github-com-akuity-kargo-api-v1alpha1-PromotionTask}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | metadata | k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta |   |
@@ -2346,7 +2346,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### PromotionTaskSpec {#github-com-akuity-kargo-api-v1alpha1-PromotionTaskSpec}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | vars | [ExpressionVariable](#github-com-akuity-kargo-api-v1alpha1-ExpressionVariable) |  Vars specifies the variables available to the PromotionTask. The values of these variables are the default values that can be overridden by the step referencing the task. |
@@ -2439,7 +2439,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### StageStatus.AutoPromotionHoldsEntry {#github-com-akuity-kargo-api-v1alpha1-StageStatus-AutoPromotionHoldsEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |
@@ -2447,7 +2447,7 @@ RawFormat specifies the format for raw resource representation.
 
 
 ### StageStatus.MetadataEntry {#github-com-akuity-kargo-api-v1alpha1-StageStatus-MetadataEntry}
- 
+
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | key | string |   |

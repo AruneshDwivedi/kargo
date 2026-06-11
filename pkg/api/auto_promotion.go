@@ -304,8 +304,10 @@ func CreatePendingAutoPromotionHold(
 		CreatedAt:     new(metav1.Now().Rfc3339Copy()),
 	}
 
-	// Hold-first. The only precondition checked against live state is that no
-	// hold already exists for this origin; an in-flight rollback owns it.
+	// Hold-first. The only precondition re-checked inside the patch loop is
+	// that no hold already exists for this origin; an in-flight rollback owns
+	// it. The check is only as fresh as c's reads (a cache-backed client may
+	// lag); the optimistic lock on the status patch is the real guard.
 	if _, err := PatchStageAutoPromotionHolds(
 		ctx,
 		c,

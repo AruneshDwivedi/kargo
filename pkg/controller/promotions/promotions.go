@@ -397,18 +397,14 @@ func (r *reconciler) Reconcile(
 		// An auto-promotion can sit Pending while the Stage controller decides
 		// whether it is the next Promotion. Re-check the live Stage immediately
 		// before it starts so a user-created hold can still supersede it.
-		outcome, liveStage, gateErr := r.gateAutoPromotion(ctx, promo, freight)
+		res, liveStage, gateErr := r.gateAutoPromotion(ctx, promo, freight)
 		if gateErr != nil {
 			return ctrl.Result{}, gateErr
 		}
-		switch outcome {
-		case gateStop:
-			return ctrl.Result{}, nil
-		case gateRetry:
-			return ctrl.Result{RequeueAfter: autoPromotionGateRetryInterval}, nil
-		case gateProceed:
-			stage = liveStage
+		if res != nil {
+			return *res, nil
 		}
+		stage = liveStage
 	}
 
 	// Update promo status as Running to give visibility in UI. Also, a promo which
@@ -438,18 +434,14 @@ func (r *reconciler) Reconcile(
 			// status writes. Re-check after the Running patch so a hold created
 			// during that small window still aborts the auto-promotion before any
 			// promotion steps execute.
-			outcome, liveStage, gateErr := r.gateAutoPromotion(ctx, promo, freight)
+			res, liveStage, gateErr := r.gateAutoPromotion(ctx, promo, freight)
 			if gateErr != nil {
 				return ctrl.Result{}, gateErr
 			}
-			switch outcome {
-			case gateStop:
-				return ctrl.Result{}, nil
-			case gateRetry:
-				return ctrl.Result{RequeueAfter: autoPromotionGateRetryInterval}, nil
-			case gateProceed:
-				stage = liveStage
+			if res != nil {
+				return *res, nil
 			}
+			stage = liveStage
 		}
 		logger.Info("began promotion")
 	} else {
@@ -617,22 +609,6 @@ func (r *reconciler) Reconcile(
 // update; the gate re-evaluates against fresh state on the retry.
 const autoPromotionGateRetryInterval = 100 * time.Millisecond
 
-// autoPromotionGateOutcome tells Reconcile how to proceed after the
-// auto-promotion hold gate ran.
-type autoPromotionGateOutcome int
-
-const (
-	// gateProceed means no hold supersedes the auto-promotion; reconciliation
-	// continues with the live Stage the gate returned.
-	gateProceed autoPromotionGateOutcome = iota
-	// gateStop means reconciliation stops without requeuing: the Stage no
-	// longer awaits the Promotion, or the gate just aborted it.
-	gateStop
-	// gateRetry means an attempt to abort the Promotion lost a race with a
-	// concurrent update; requeue shortly and re-evaluate.
-	gateRetry
-)
-
 // liveStageCheck describes what a live read of the Stage says about an
 // in-flight auto-promotion.
 type liveStageCheck int
@@ -651,13 +627,16 @@ const (
 
 // gateAutoPromotion is the hold gate for an auto-promotion: it re-checks the
 // live Stage and aborts the Promotion if an auto-promotion hold now
-// supersedes it. On gateProceed, the returned live Stage replaces the
-// caller's (possibly stale) copy.
+// supersedes it. A non-nil ctrl.Result means reconciliation must return it
+// now: empty when the Stage no longer awaits the Promotion or the gate just
+// aborted it, requeueing when an abort attempt lost a race with a concurrent
+// update and should re-evaluate shortly. On a nil result, the returned live
+// Stage replaces the caller's (possibly stale) copy.
 func (r *reconciler) gateAutoPromotion(
 	ctx context.Context,
 	promo *kargoapi.Promotion,
 	freight *kargoapi.Freight,
-) (autoPromotionGateOutcome, *kargoapi.Stage, error) {
+) (*ctrl.Result, *kargoapi.Stage, error) {
 	logger := logging.LoggerFromContext(ctx)
 
 	check, liveStage, err := r.checkLiveStageForAutoPromotion(
@@ -666,31 +645,31 @@ func (r *reconciler) gateAutoPromotion(
 		freight.Origin,
 	)
 	if err != nil {
-		return gateStop, nil, err
+		return nil, nil, err
 	}
 	if check == stageNotAwaitingPromotion {
 		// The watch on the Stage will requeue the Promotion if the Stage
 		// acknowledges it.
 		logger.Debug("Stage is not awaiting Promotion", "stage", promo.Spec.Stage, "promotion", promo.Name)
-		return gateStop, nil, nil
+		return &ctrl.Result{}, nil, nil
 	}
 	if check == stageAwaitingPromotion {
-		return gateProceed, liveStage, nil
+		return nil, liveStage, nil
 	}
 
 	aborted, err := r.abortAutoPromotion(ctx, client.ObjectKeyFromObject(promo), freight)
 	if err != nil {
-		return gateStop, nil, err
+		return nil, nil, err
 	}
 	if !aborted {
-		return gateRetry, nil, nil
+		return &ctrl.Result{RequeueAfter: autoPromotionGateRetryInterval}, nil, nil
 	}
 	logger.Info(
 		"aborted auto-promotion blocked by auto-promotion hold",
 		"stage", promo.Spec.Stage,
 		"freight", freight.Name,
 	)
-	return gateStop, nil, nil
+	return &ctrl.Result{}, nil, nil
 }
 
 // checkLiveStageForAutoPromotion reads the live Stage and reports where this
@@ -841,7 +820,7 @@ func (r *reconciler) abortAutoPromotion(
 		aborted = true
 		return true, nil
 	})
-	if err != nil || !aborted {
+	if err != nil || live == nil || !aborted {
 		return false, err
 	}
 
@@ -1063,6 +1042,22 @@ func (r *reconciler) terminatePromotion(
 	}
 
 	logger.Info("terminating Promotion")
+
+	// A machine abort-reason annotation can linger from a hold abort that was
+	// started but never completed. Clear it so this user-requested abort is not
+	// mistaken for a hold abort, which would let auto-promotion immediately
+	// retry the same Freight.
+	if promo.Annotations[kargoapi.AnnotationKeyAbortReason] ==
+		kargoapi.AnnotationValueAbortReasonAutoPromotionHold {
+		original := promo.DeepCopy()
+		delete(promo.Annotations, kargoapi.AnnotationKeyAbortReason)
+		if err := r.kargoClient.Patch(ctx, promo, client.MergeFrom(original)); err != nil {
+			return fmt.Errorf(
+				"error clearing abort reason annotation on Promotion %q in namespace %q: %w",
+				promo.Name, promo.Namespace, err,
+			)
+		}
+	}
 
 	// Normally, the actor is inherited from the creator of the Promotion for
 	// events. For an abort request, however, we do not want to inherit this
