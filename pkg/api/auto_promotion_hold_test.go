@@ -878,11 +878,18 @@ func TestClearAutoPromotionHoldRequestFromPromotion(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			require.Equal(
-				t,
-				testCase.expected,
-				ClearAutoPromotionHoldRequestFromPromotion(testCase.promo),
-			)
+			actual := ClearAutoPromotionHoldRequestFromPromotion(testCase.promo)
+			if testCase.expected == nil {
+				require.Nil(t, actual)
+				return
+			}
+			require.NotNil(t, actual)
+			require.Equal(t, testCase.expected.Origin, actual.Origin)
+			require.Equal(t, testCase.expected.PromotionName, actual.PromotionName)
+			require.Equal(t, testCase.expected.PromotionUID, actual.PromotionUID)
+			// Compare instants, not representations: unmarshaling converts the
+			// timestamp to the local time zone, so deep equality is TZ-dependent.
+			require.True(t, testCase.expected.CreatedAt.Equal(actual.CreatedAt))
 		})
 	}
 }
