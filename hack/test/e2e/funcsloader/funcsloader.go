@@ -15,6 +15,7 @@ func GetFuncs() ([]env.Func, []env.Func) {
 			// TODO: add all setup functions here
 			envfuncs.LoadKargoConfig,
 			envfuncs.LoadKargoClient,
+			envfuncs.LoadArgocdConfig,
 		},
 		[]env.Func{
 			noopFunc,
