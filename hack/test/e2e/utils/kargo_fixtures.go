@@ -11,11 +11,15 @@ import (
 	"os"
 	"testing"
 
+	"github.com/akuity/kargo/pkg/cli/client"
+	"github.com/akuity/kargo/pkg/cli/config"
 	"github.com/akuity/kargo/pkg/client/generated"
 	kargoresouces "github.com/akuity/kargo/pkg/client/generated/resources"
+	"github.com/akuity/kargo/pkg/client/watch"
 	"sigs.k8s.io/e2e-framework/klient/decoder"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/pkg/features"
 	"sigs.k8s.io/yaml"
 )
 
@@ -28,16 +32,82 @@ func testFiles(testdata fs.FS) ([]string, error) {
 	return files, nil
 }
 
-func RequireKargoCli(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-	_, ok := ctx.Value("kargo_cli").(generated.KargoAPI)
-	if !ok {
-		t.Fatalf("kargo_cli is required in context")
+func SetupKargoClients(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+	ctx = SetupKargoApiClient(ctx, t, cfg)
+	return SetupKargoWatchClient(ctx, t, cfg)
+}
+
+func SetupKargoApiClient(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+	if _, ok := ctx.Value("kargo_cli").(generated.KargoAPI); ok {
+		return ctx
+	}
+
+	if kargoConfig, ok := ctx.Value("kargo_config").(config.CLIConfig); ok {
+		kargoClient, err := client.GetClientFromConfig(ctx, kargoConfig, client.Options{})
+		if err != nil {
+			t.Fatalf("error loading kargo client: %v", err)
+		}
+		return context.WithValue(ctx, "kargo_cli", *kargoClient)
+	}
+
+	t.Fatalf("error getting kargo_config from the context %v", ctx)
+	return ctx
+}
+
+func SetupKargoWatchClient(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+	if _, ok := ctx.Value("kargo_watch").(watch.Client); ok {
+		return ctx
+	}
+
+	if kargoConfig, ok := ctx.Value("kargo_config").(config.CLIConfig); ok {
+		watchClient, err := client.GetWatchClientFromConfig(ctx, kargoConfig, client.Options{})
+		if err != nil {
+			t.Fatalf("error loading kargo watch client: %v", err)
+		}
+		return context.WithValue(ctx, "kargo_watch", *watchClient)
+	}
+
+	t.Fatalf("error getting kargo_config from the context %v", ctx)
+	return ctx
+}
+
+func NewSetupKargoFixtures(options ...decoder.DecodeOption) features.Func {
+	return func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+		return SetupKargoFixturesWithOptions(ctx, t, cfg, options...)
+	}
+}
+
+func NewTeardownKargoFixtures(options ...decoder.DecodeOption) features.Func {
+	return func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+		return TeardownKargoFixturesWithOptions(ctx, t, cfg, options...)
+	}
+}
+
+func SetupKargoFixturesWithOptions(
+	ctx context.Context, 
+	t *testing.T, 
+	cfg *envconf.Config,
+	options ...decoder.DecodeOption,
+) context.Context {
+	err := scanFixtures(ctx, sortAsc, KargoCreateHandler(), options...)
+	if err != nil {
+		t.Fatal(err)
 	}
 	return ctx
 }
 
 func SetupKargoFixtures(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-	err := scanFixtures(ctx, sortAsc, KargoCreateHandler())
+	return SetupKargoFixturesWithOptions(ctx, t, cfg)
+}
+
+func TeardownKargoFixturesWithOptions(
+	ctx context.Context, 
+	t *testing.T, 
+	cfg *envconf.Config,
+	options ...decoder.DecodeOption,
+) context.Context {
+	// FIXME: test failure scenarios to assure cleanup
+	err := scanFixtures(ctx, sortDesc, KargoDeleteHandler(), options...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,12 +115,7 @@ func SetupKargoFixtures(ctx context.Context, t *testing.T, cfg *envconf.Config) 
 }
 
 func TeardownKargoFixtures(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-	// FIXME: test failure scenarios to assure cleanup
-	err := scanFixtures(ctx, sortDesc, KargoDeleteHandler())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return ctx
+	return TeardownKargoFixturesWithOptions(ctx, t, cfg)
 }
 
 func scanFixtures(
@@ -59,7 +124,7 @@ func scanFixtures(
 	handlerFun decoder.HandlerFunc, 
 	options ...decoder.DecodeOption) error {	
 
-	testdata := os.DirFS("testdata")
+	testdata := os.DirFS("testdata/kargo")
 	files, err := testFiles(testdata)
 	if err != nil {
 		return err

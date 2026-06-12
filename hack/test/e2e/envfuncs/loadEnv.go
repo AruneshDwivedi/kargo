@@ -14,7 +14,7 @@ import (
 var envFileName string
 
 func init() {
-	flag.StringVar(&envFileName, "env-file", "envs/dev.yaml", "E2E test environment file")
+	flag.StringVar(&envFileName, "env-file", "home_config.yaml", "E2E test environment file")
 }
 
 func LoadEnvFile(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
